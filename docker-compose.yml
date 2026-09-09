@@ -1,0 +1,13 @@
+services:
+  monitor-aemet:
+    build: .
+    container_name: monitor-aemet
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      PORT: "3000"
+      # Opcional: si prefieres no guardar la API key en config.json
+      # AEMET_API_KEY: "tu-clave"

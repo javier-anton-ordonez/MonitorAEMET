@@ -1,0 +1,10 @@
+{
+  "name": "monitor-aemet",
+  "version": "1.0.0",
+  "description": "Monitor de estaciones meteorológicas AEMET con tracking de uptime",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  }
+}

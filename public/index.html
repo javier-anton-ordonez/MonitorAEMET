@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitor AEMET · Uptime estaciones meteorológicas</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-title">
+      <h1>Monitor AEMET</h1>
+      <span class="subtitle">Uptime estaciones meteorológicas</span>
+    </div>
+    <div class="stat" id="stat-global">
+      <span class="stat-label">Uptime global</span>
+      <span class="stat-value" id="global-uptime">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Estaciones online</span>
+      <span class="stat-value" id="global-online">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Último check</span>
+      <span class="stat-value" id="global-lastcheck">—</span>
+    </div>
+    <button id="theme-toggle" class="theme-toggle" type="button">Modo oscuro</button>
+  </header>
+
+  <div class="legend">
+    <span class="legend-title">Uptime histórico de cada estación:</span>
+    <span class="legend-item"><span class="legend-dot green"></span>&gt; 99%</span>
+    <span class="legend-item"><span class="legend-dot yellow"></span>99 – 90%</span>
+    <span class="legend-item"><span class="legend-dot red"></span>&lt; 90%</span>
+    <span class="legend-item"><span class="legend-dot grey"></span>sin datos</span>
+  </div>
+
+  <div id="map"></div>
+
+  <footer id="footer" class="footer">Cargando datos…</footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>
