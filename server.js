@@ -15,8 +15,8 @@ const HISTORY_DAYS = 90;
 const FETCH_TIMEOUT_MS = 45000;
 const CACHE_TTL_MS = 30000;
 
-const GREEN = { min: 99.9 };
-const YELLOW = { min: 99.0 };
+const GREEN = { min: 99.0 };
+const YELLOW = { min: 90.0 };
 
 function readJson(file, fallback) {
   try {

@@ -85,8 +85,8 @@
     const tip = label + ' · ' + fmtPct(pct === null ? null : pct / 100);
     if (pct === null) return '<span class="uptime-cell" title="' + tip + '"></span>';
     let cls = 'red';
-    if (pct >= 99.9) cls = 'green';
-    else if (pct >= 99.0) cls = 'yellow';
+    if (pct >= 99.0) cls = 'green';
+    else if (pct >= 90.0) cls = 'yellow';
     return '<span class="uptime-cell ' + cls + '" title="' + tip + '"></span>';
   }
 
@@ -125,9 +125,9 @@
       '<div class="popup-days-label">Últimos 90 días</div>' +
       '<div class="uptime-grid">' + cells + '</div>' +
       '<div class="popup-legend">' +
-      '<span><span class="bar green"></span>100%</span>' +
-      '<span><span class="bar yellow"></span>≥99%</span>' +
-      '<span><span class="bar red"></span>&lt;99%</span>' +
+      '<span><span class="bar green"></span>≥99%</span>' +
+      '<span><span class="bar yellow"></span>90–99%</span>' +
+      '<span><span class="bar red"></span>&lt;90%</span>' +
       '<span><span class="bar grey"></span>sin datos</span>' +
       '</div>'
     );
@@ -170,7 +170,7 @@
 
     const uptimePct = fmtPct(g && g.uptime !== null ? g.uptime : null);
     gEl.textContent = uptimePct;
-    gEl.className = 'stat-value ' + (g && g.uptime !== null && g.uptime >= 0.999 ? 'ok' : (g && g.uptime !== null && g.uptime >= 0.99 ? 'warn' : 'bad'));
+    gEl.className = 'stat-value ' + (g && g.uptime !== null && g.uptime >= 0.99 ? 'ok' : (g && g.uptime !== null && g.uptime >= 0.90 ? 'warn' : 'bad'));
 
     oEl.textContent = (g && g.onlineNowTotal ? g.onlineNow + ' / ' + g.onlineNowTotal : '—');
     oEl.className = 'stat-value ' + (g && g.onlineNowTotal && g.onlineNow === g.onlineNowTotal ? 'ok' : 'warn');

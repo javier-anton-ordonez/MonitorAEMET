@@ -31,14 +31,22 @@ La respuesta se materializa en **estadísticas de uptime por estación** y un **
 
 ### ¿Qué significa el color de una estación?
 
-| Color | Significado |
-|-------|-------------|
-| 🟢 Verde | Uptime ≥ 99.9 % |
-| 🟡 Amarillo | Uptime ≥ 99.0 % |
-| 🔴 Rojo | Uptime < 99.0 % |
-| ⚪ Gris | Sin datos suficientes (< 3 comprobaciones) |
+| Color | Uptime | Interpretación |
+|-------|--------|----------------|
+| 🟢 Verde | ≥ 99 % | Servicio excelente, propio de infraestructuras de calidad |
+| 🟡 Amarillo | 90 – 99 % | Fiable con pequeñas interrupciones ocasionales |
+| 🔴 Rojo | < 90 % | Disponibilidad deficiente, no recomendable como fuente |
+| ⚪ Gris | Sin datos suficientes | Menos de 3 comprobaciones registradas |
 
 > Las estaciones comienzan en gris y necesitan al menos 3 comprobaciones para obtener un diagnóstico de color, evitando falsas alarmas con muestras demasiado pequeñas.
+
+### ¿Por qué el umbral de calidad en el 99 %?
+
+La industria y la administración digital suelen exigir a sus servicios **"cinco nueves" (99.999 %) de disponibilidad** — apenas 26 segundos de caída al mes. Ese nivel es el de las grandes operadoras o servicios críticos.
+
+Este proyecto no aplica ese baremo tan estricto: el objetivo es saber si una **persona común** puede fiarse del dato oficial en su día a día. Ahí el estándar razonable es mucho más humano: un servicio que responde el **99 % o más** del tiempo (menos de ~7 horas de caída al año) se considera **totalmente fiable** para un uso cotidiano; entre **90 % y 99 %** sigue siendo **utilizable**, con interrupciones ocasionales; y por debajo del **90 %** (más de 36 días sin servicio al año) deja de ser útil como fuente habitual.
+
+Dicho de otra forma: este panel responde a la pregunta **"¿puedo consultar el tiempo oficial cuando lo necesito?"**, no a **"¿cumple el contrato de 5 nueves de un datacenter?"**. Si una estación queda **verde**, el usuario normal puede contar con ella; si está **roja**, mejor buscar otra fuente.
 
 ### Y los límites de las APIs, ¿se tienen en cuenta?
 
