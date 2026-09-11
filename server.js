@@ -80,6 +80,7 @@ async function mfGetToken(i) {
       if (!j.access_token) throw new Error('Respuesta de token sin access_token');
       const expiresInSec = Math.min(Number(j.expires_in) || 3600, 3600);
       mfTokens[i] = { token: j.access_token, expiry: Date.now() + expiresInSec * 1000 };
+      mfTokenPromises[i] = null;
       console.log('[Météo-France] Cuenta ' + (i + 1) + '/' + mfCreds.length + ': token renovado (' + Math.round(expiresInSec / 60) + ' min)');
       return mfTokens[i].token;
     })().catch((err) => {
@@ -156,7 +157,7 @@ async function mfTryStation(id, token) {
         { headers: { Authorization: 'Bearer ' + token } },
         15000
       );
-      if (r.status === 429 || r.status >= 500) {
+      if (r.status === 429 || r.status === 401 || r.status === 403 || r.status >= 500) {
         return 'throttled';
       }
       if (r.ok) {
@@ -495,6 +496,7 @@ frMonitor.doRunCheck = async function () {
   try {
     await this.ensureStations(ts);
     if (!mfCreds.length) throw new Error('Falta meteoFranceAuth en config.json');
+    await mfGetToken(0);
 
     let idx = 0;
     const worker = async () => {
