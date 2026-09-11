@@ -217,19 +217,21 @@
       let mk = markers.get(item.key);
       if (!mk) {
         const latlng = L.latLng(item.st.lat, item.st.lon);
-        mk = L.circleMarker(latlng, {
-          radius: 6,
+        const fill = colorFor(item.st.status);
+        mk = L.circle(latlng, {
+          radius: 13700,
           weight: 1.5,
-          color: stroke,
-          fillColor: colorFor(item.st.status),
-          fillOpacity: 1
+          color: fill,
+          fillColor: fill,
+          fillOpacity: 0.45
         }).addTo(layerGroup);
         mk.on('click', function () {
           openKey = item.key;
           mk.bindPopup(buildPopup(item.st, item.dayLabels, item.flag), { maxWidth: 360, minWidth: 280 }).openPopup();
         });
       } else {
-        mk.setStyle({ fillColor: colorFor(item.st.status), fillOpacity: 1 });
+        const fill = colorFor(item.st.status);
+        mk.setStyle({ color: fill, fillColor: fill, fillOpacity: 0.45 });
         if (mk.getPopup() && mk.getPopup().isOpen()) {
           mk.getPopup().setContent(buildPopup(item.st, item.dayLabels, item.flag));
         }
