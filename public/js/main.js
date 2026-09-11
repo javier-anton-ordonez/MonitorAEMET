@@ -9,14 +9,14 @@
   };
 
   const TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const ATTRIB = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://www.aemet.es">AEMET</a>';
+  const ATTRIB = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://www.aemet.es">AEMET</a> &copy; Météo-France';
 
   let map;
-  let tileLayer;
   let layerGroup;
   let markers = new Map();
-  let lastData = null;
-  let openPopupId = null;
+  let lastData = { es: null, fr: null };
+  let activeView = 'both';
+  let openKey = null;
   let dark = false;
 
   function isDark() {
@@ -44,16 +44,25 @@
 
   function initMap() {
     map = L.map('map', {
-      center: [40.0, -3.7],
-      zoom: 6,
-      minZoom: 4,
+      center: [45.0, 1.5],
+      zoom: 5,
+      minZoom: 3,
       maxZoom: 12
     });
-    tileLayer = L.tileLayer(TILES, {
-      attribution: ATTRIB,
-      maxZoom: 19
-    }).addTo(map);
+    L.tileLayer(TILES, { attribution: ATTRIB, maxZoom: 19 }).addTo(map);
     layerGroup = L.layerGroup().addTo(map);
+  }
+
+  function setView(view) {
+    activeView = view;
+    document.querySelectorAll('.view-btn').forEach(function (b) { b.classList.remove('active'); });
+    const btn = document.getElementById('view-' + view);
+    if (btn) btn.classList.add('active');
+    if (lastData.es || lastData.fr) {
+      updateGlobal();
+      renderAll();
+      fitView();
+    }
   }
 
   function colorFor(status) {
@@ -76,12 +85,12 @@
     const tip = label + ' · ' + fmtPct(pct === null ? null : pct / 100);
     if (pct === null) return '<span class="uptime-cell" title="' + tip + '"></span>';
     let cls = 'red';
-    if (pct >= 99.0) cls = 'green';
-    else if (pct >= 90.0) cls = 'yellow';
+    if (pct >= 99.9) cls = 'green';
+    else if (pct >= 99.0) cls = 'yellow';
     return '<span class="uptime-cell ' + cls + '" title="' + tip + '"></span>';
   }
 
-  function buildPopup(st, dayLabels) {
+  function buildPopup(st, dayLabels, flag) {
     let estado;
     if (st.onlineNow === true) {
       estado = '<span class="status-dot on" title="Online ahora"></span> Encendida en el último check';
@@ -108,7 +117,7 @@
     if (geo.length) meta += ' · ' + geo.join(' · ');
 
     return (
-      '<div class="popup-title">' + escapeHtml(st.nombre) + '</div>' +
+      '<div class="popup-title">' + flag + ' ' + escapeHtml(st.nombre) + '</div>' +
       '<div class="popup-meta">' + meta + '</div>' +
       '<div class="popup-status">' + estado + '</div>' +
       '<div class="popup-uptime-label">Uptime histórico</div>' +
@@ -130,89 +139,168 @@
     });
   }
 
-  function updateGlobal(data) {
-    const g = data.global;
+  function combineGlobal(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    const denom = (a.totalStations || 0) + (b.totalStations || 0);
+    let up = null;
+    if (a.uptime !== null && b.uptime !== null) {
+      up = (a.uptime * (a.totalStations || 0) + b.uptime * (b.totalStations || 0)) / denom;
+    } else if (a.uptime !== null) up = a.uptime;
+    else if (b.uptime !== null) up = b.uptime;
+    return {
+      uptime: up,
+      totalStations: denom,
+      onlineNow: (a.onlineNow || 0) + (b.onlineNow || 0),
+      onlineNowTotal: (a.onlineNowTotal || 0) + (b.onlineNowTotal || 0),
+      lastCheckTs: Math.max(a.lastCheckTs || 0, b.lastCheckTs || 0) || null,
+      lastCheckOk: a.lastCheckOk && b.lastCheckOk,
+      intervalMin: [a.intervalMin, b.intervalMin]
+    };
+  }
+
+  function updateGlobal() {
+    const combined = combineGlobal(lastData.es && lastData.es.global, lastData.fr && lastData.fr.global);
+    const g = activeView === 'es' ? (lastData.es && lastData.es.global) :
+      (activeView === 'fr' ? (lastData.fr && lastData.fr.global) : combined);
     const gEl = document.getElementById('global-uptime');
     const oEl = document.getElementById('global-online');
     const lEl = document.getElementById('global-lastcheck');
     const fEl = document.getElementById('footer');
 
-    const uptimePct = fmtPct(g.uptime);
+    const uptimePct = fmtPct(g && g.uptime !== null ? g.uptime : null);
     gEl.textContent = uptimePct;
-    gEl.className = 'stat-value ' + (g.uptime !== null && g.uptime >= 0.999 ? 'ok' : (g.uptime !== null && g.uptime >= 0.99 ? 'warn' : 'bad'));
+    gEl.className = 'stat-value ' + (g && g.uptime !== null && g.uptime >= 0.999 ? 'ok' : (g && g.uptime !== null && g.uptime >= 0.99 ? 'warn' : 'bad'));
 
-    oEl.textContent = (g.onlineNowTotal ? g.onlineNow + ' / ' + g.onlineNowTotal : '—');
-    oEl.className = 'stat-value ' + (g.onlineNowTotal && g.onlineNow === g.onlineNowTotal ? 'ok' : 'warn');
-    lEl.textContent = fmtDate(g.lastCheckTs);
+    oEl.textContent = (g && g.onlineNowTotal ? g.onlineNow + ' / ' + g.onlineNowTotal : '—');
+    oEl.className = 'stat-value ' + (g && g.onlineNowTotal && g.onlineNow === g.onlineNowTotal ? 'ok' : 'warn');
+    lEl.textContent = fmtDate(g && g.lastCheckTs);
 
-    fEl.textContent = 'Actualizado: ' + new Date(data.generatedAt).toLocaleString('es-ES') +
-      ' · Check cada ' + g.intervalMin + ' min · Total estaciones: ' + g.totalStations +
-      (g.lastCheckOk === false ? ' · ⚠ Última petición a AEMET falló' : '');
+    let intervalTxt = '';
+    if (g && Array.isArray(g.intervalMin)) {
+      intervalTxt = 'Check ES/FR: ' + g.intervalMin.join('/') + ' min';
+    } else if (g && g.intervalMin) {
+      intervalTxt = 'Check cada ' + g.intervalMin + ' min';
+    }
+    let warn = '';
+    if (g && g.lastCheckOk === false) warn = ' · ⚠ Última petición a AEMET o Météo-France falló';
+    fEl.textContent = 'Actualizado: ' + new Date(dataGeneratedAt()).toLocaleString('es-ES') +
+      ' · ' + intervalTxt + ' · Total estaciones: ' + (g ? g.totalStations : '—') + warn;
   }
 
-  function renderMarkers(data) {
-    const dayLabels = data.dayLabels;
-    const stroke = getComputedStyle(document.documentElement).getPropertyValue('--map-stroke').trim() || '#ffffff';
-    const newMarkers = new Map();
+  function dataGeneratedAt() {
+    const es = lastData.es, fr = lastData.fr;
+    if (es && fr) return Math.max(es.generatedAt, fr.generatedAt);
+    return (es || fr || {}).generatedAt || Date.now();
+  }
 
-    data.stations.forEach(function (st) {
-      if (st.lat === null || st.lon === null) return;
-      let mk = markers.get(st.id);
+  function renderAll() {
+    const stroke = getComputedStyle(document.documentElement).getPropertyValue('--map-stroke').trim() || '#ffffff';
+    const items = [];
+
+    const add = function (country, data) {
+      if (!data) return;
+      const flag = country === 'es' ? '🇪🇸' : '🇫🇷';
+      data.stations.forEach(function (st) {
+        if (st.lat === null || st.lon === null) return;
+        items.push({ key: country + '-' + st.id, st: st, flag: flag, dayLabels: data.dayLabels });
+      });
+    };
+
+    const showEs = activeView !== 'fr';
+    const showFr = activeView !== 'es';
+    if (showEs) add('es', lastData.es);
+    if (showFr) add('fr', lastData.fr);
+
+    const newMarkers = new Map();
+    items.forEach(function (item) {
+      let mk = markers.get(item.key);
       if (!mk) {
-        mk = L.circleMarker([st.lat, st.lon], {
+        const latlng = L.latLng(item.st.lat, item.st.lon);
+        mk = L.circleMarker(latlng, {
           radius: 6,
           weight: 1.5,
           color: stroke,
-          fillColor: colorFor(st.status),
+          fillColor: colorFor(item.st.status),
           fillOpacity: 1
-        });
+        }).addTo(layerGroup);
         mk.on('click', function () {
-          openPopupId = st.id;
-          mk.bindPopup(buildPopup(st, dayLabels), { maxWidth: 360, minWidth: 280 }).openPopup();
+          openKey = item.key;
+          mk.bindPopup(buildPopup(item.st, item.dayLabels, item.flag), { maxWidth: 360, minWidth: 280 }).openPopup();
         });
       } else {
-        mk.setStyle({ fillColor: colorFor(st.status), fillOpacity: 1 });
+        mk.setStyle({ fillColor: colorFor(item.st.status), fillOpacity: 1 });
+        if (mk.getPopup() && mk.getPopup().isOpen()) {
+          mk.getPopup().setContent(buildPopup(item.st, item.dayLabels, item.flag));
+        }
       }
-      mk.setLatLng([st.lat, st.lon]);
-      newMarkers.set(st.id, mk);
-      mk.addTo(layerGroup);
+      newMarkers.set(item.key, mk);
     });
 
-    markers.forEach(function (mk, id) {
-      if (!newMarkers.has(id)) layerGroup.removeLayer(mk);
+    markers.forEach(function (mk, key) {
+      if (!newMarkers.has(key)) layerGroup.removeLayer(mk);
     });
     markers = newMarkers;
 
-    if (openPopupId) {
-      const st = data.stations.find(function (x) { return x.id === openPopupId; });
-      const mk = markers.get(openPopupId);
-      if (st && mk && mk.getPopup() && mk.getPopup().isOpen()) {
-        mk.getPopup().setContent(buildPopup(st, dayLabels));
+    if (openKey) {
+      const found = items.find(function (i) { return i.key === openKey; });
+      const mk = markers.get(openKey);
+      if (found && mk && mk.getPopup() && mk.getPopup().isOpen()) {
+        mk.getPopup().setContent(buildPopup(found.st, found.dayLabels, found.flag));
       } else {
-        openPopupId = null;
+        openKey = null;
       }
     }
   }
 
+  function fitView() {
+    const pts = [];
+    const add = function (data) {
+      if (!data) return;
+      data.stations.forEach(function (s) {
+        if (s.lat !== null && s.lon !== null) pts.push([s.lat, s.lon]);
+      });
+    };
+    if (activeView !== 'fr') add(lastData.es);
+    if (activeView !== 'es') add(lastData.fr);
+    if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [15, 15], maxZoom: 6 });
+  }
+
   async function refresh() {
     try {
-      const resp = await fetch('/api/data');
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const data = await resp.json();
-      lastData = data;
-      updateGlobal(data);
-      renderMarkers(data);
+      const [es, fr] = await Promise.all([
+        fetch('/api/data').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+        fetch('/api/data-fr').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+      ]);
+      const firstLoad = !lastData.es && !lastData.fr;
+      if (es) {
+        lastData.es = es;
+        lastData.es.global = es.global;
+      }
+      if (fr) {
+        lastData.fr = fr;
+        lastData.fr.global = fr.global;
+      }
+      updateGlobal();
+      renderAll();
+      if (firstLoad) fitView();
     } catch (e) {
       document.getElementById('footer').textContent = 'Error cargando datos: ' + e.message;
     }
   }
 
-  initTheme();
+  function bindViewButtons() {
+    document.getElementById('view-es').addEventListener('click', function () { setView('es'); });
+    document.getElementById('view-fr').addEventListener('click', function () { setView('fr'); });
+    document.getElementById('view-both').addEventListener('click', function () { setView('both'); });
+  }
 
+  initTheme();
   document.getElementById('theme-toggle').addEventListener('click', function () {
     applyTheme(!isDark());
-    if (lastData) renderMarkers(lastData);
+    renderAll();
   });
+  bindViewButtons();
 
   initMap();
   refresh();
