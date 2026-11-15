@@ -365,20 +365,53 @@ function createMonitor(name, options) {
 // ---------------------------------------------------------------------------
 // Monitor AEMET (España)
 // ---------------------------------------------------------------------------
-async function fetchAllObservations() {
+// Error específico: la API de AEMET no ha dado el link de datos. En ese caso
+// el check se omite (no se cuenta ni como online ni como caída de estaciones).
+class ApiLinkError extends Error {}
+
+const LINK_RETRIES = 3;
+const LINK_RETRY_DELAY_MS = 5000;
+
+async function fetchDataLink() {
   const metaUrl = 'https://opendata.aemet.es/opendata/api/observacion/convencional/todas';
-  const res1 = await fetchWithTimeout(
-    metaUrl,
-    { headers: { 'api_key': API_KEY, 'cache-control': 'no-cache' } },
-    FETCH_TIMEOUT_MS
-  );
-  if (!res1.ok) throw new Error('HTTP ' + res1.status + ' en API');
-  const j1 = await res1.json();
-  if (!j1 || !j1.datos) {
-    throw new Error('Respuesta API sin URL de datos: ' + JSON.stringify(j1).slice(0, 300));
+  let lastErr = null;
+  for (let attempt = 1; attempt <= LINK_RETRIES; attempt++) {
+    try {
+      const res = await fetchWithTimeout(
+        metaUrl,
+        { headers: { 'api_key': API_KEY, 'cache-control': 'no-cache' } },
+        FETCH_TIMEOUT_MS
+      );
+      let body = null;
+      try {
+        body = await res.json();
+      } catch {
+        body = null;
+      }
+      if (!res.ok) {
+        const desc = body && body.descripcion ? ' (' + body.descripcion + ')' : '';
+        throw new Error('HTTP ' + res.status + ' en API' + desc);
+      }
+      if (body && body.estado !== undefined && Number(body.estado) !== 200) {
+        throw new Error('estado ' + body.estado + ' en API: ' + (body.descripcion || ''));
+      }
+      if (!body || typeof body.datos !== 'string' || !body.datos.startsWith('http')) {
+        throw new Error('Respuesta API sin URL de datos: ' + JSON.stringify(body).slice(0, 300));
+      }
+      return body.datos;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < LINK_RETRIES) await sleep(LINK_RETRY_DELAY_MS * attempt);
+    }
   }
+  throw new ApiLinkError(lastErr ? lastErr.message : 'fallo desconocido al obtener el link');
+}
+
+async function fetchAllObservations() {
+  // Fase 1: obtener el link. Si falla, no se continúa con la fase 2.
+  const dataUrl = await fetchDataLink();
   const res2 = await fetchWithTimeout(
-    j1.datos,
+    dataUrl,
     { headers: { 'api_key': API_KEY } },
     FETCH_TIMEOUT_MS
   );
@@ -441,6 +474,16 @@ esMonitor.doRunCheck = async function () {
     this.saveStations();
     this.lastCheckOk = true;
   } catch (e) {
+    if (e instanceof ApiLinkError) {
+      // La API no ha dado el link: check omitido, sin tocar contadores.
+      this.lastCheckOk = false;
+      console.warn(`[${this.name}] check OMITIDO ${ts} — no se obtuvo el link de datos: ${e.message}. No se cuenta para el uptime.`);
+      this.checks.push({ ts, error: true, online: [] });
+      this.saveUptime();
+      this.pruneIfNeeded();
+      this.lastCheckTs = ts;
+      return;
+    }
     onlineSet = new Set();
     this.lastCheckOk = false;
     console.error(`[${this.name}] check ERROR ${ts} — ${e.message}. Se cuenta como 0 estaciones online.`);
